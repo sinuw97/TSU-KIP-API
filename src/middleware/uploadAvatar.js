@@ -2,20 +2,14 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 
-const dir = '/uploads/avatars';
-if (!fs.existsSync(dir)) {
-  fs.mkdirSync(dir, { recursive: true });
+const uploadPath = path.resolve("src", "uploads", "avatars");
+
+if (!fs.existsSync(uploadPath)) {
+  fs.mkdirSync(uploadPath, { recursive: true });
 }
 
-// config multer
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadPath = path.resolve("src", "uploads", "avatars");
-
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
@@ -25,7 +19,6 @@ const storage = multer.diskStorage({
   }
 });
 
-// filter file (jpg, png, jpeg)
 const fileFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -38,6 +31,10 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 }, fileFilter });
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter,
+});
 
 export default upload;

@@ -14,7 +14,7 @@ const StudentsDetails = db.define('student_detail', {
       key: 'user_id'
     },
     onDelete: 'CASCADE',
-    onUpdate: 'CASCADE'
+    onUpdate: 'CASCADE',
   },
   prodi: {
     type: DataTypes.STRING(100),

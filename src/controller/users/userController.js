@@ -1,7 +1,17 @@
-import bcrypt from 'bcrypt';
-import { createUser, getAllUsers, getDetailUserById, getUserByEmail, getUserById, updateUserProfile } from '../../service/users/userServices.js';
-import { extractAngkatanProdi } from '../../helper.js';
-import { error } from 'console';
+import bcrypt from "bcrypt";
+import dotenv from 'dotenv';
+import jwt from "jsonwebtoken";
+import path from 'path';
+import fs from 'fs';
+import {
+  getAllUsers,
+  getDetailUserById,
+  getUserByEmail,
+  getUserById,
+  updateUserProfile,
+  validateEmail,
+} from "../../service/users/userServices.js";
+dotenv.config();
 
 //Login
 export const loginController = async (req, res) => {
@@ -11,15 +21,24 @@ export const loginController = async (req, res) => {
     if (!email || !password) {
       return res.status(422).json({
         error: true,
-        message: 'Silahkan isi email dan password terlebih dahulu!',
+        message: "Silahkan isi email dan password terlebih dahulu!",
       });
+    }
+
+    // Validasi email regex
+    const testEmail = validateEmail(email);
+    if (!testEmail) {
+      return res.status(400).json({
+        error: true,
+        message: 'Email tidak valid'
+      })
     }
 
     const userData = await getUserByEmail(email);
     if (!userData) {
       return res.status(401).json({
         error: true,
-        message: 'Email tidak terdaftar!',
+        message: "Email tidak terdaftar!",
       });
     }
 
@@ -27,19 +46,21 @@ export const loginController = async (req, res) => {
     if (!passwordMatch) {
       return res.status(401).json({
         error: true,
-        message: 'Password tidak cocok!'
+        message: "Password tidak cocok!",
       });
     }
 
     const { password: _, ...userWithoutPassword } = userData.toJSON();
+    const token = jwt.sign(userWithoutPassword, process.env.TSU_TOKEN_SECRET);
 
     return res.status(200).json({
       error: false,
-      message: 'Ok',
+      message: "Ok",
       data: {
-        user: userWithoutPassword
-      }
-    })
+        token,
+        user: userWithoutPassword,
+      },
+    });
   } catch (error) {
     res.status(500).json({
       error: true,
@@ -48,102 +69,31 @@ export const loginController = async (req, res) => {
   }
 };
 
-//Register
-export const registerController = async (req, res) => {
-  try {
-    const { user_id, name, email, password, role, kelas, jenis_kelamin, jenis_beasiswa } = req.body;
-
-    if (!/^\d{8}$/.test(user_id)) {
-      return res.status(400).json({
-        error: true,
-        message: 'Format NIM/user_id tidak valid. Harus 8 digit angka!'
-      });
-    }
-
-    const trimmedEmail = email.trim().toLowerCase();
-    const trimmedName = name.trim();
-
-    const existingEmail = await getUserByEmail(trimmedEmail);
-    if (existingEmail) {
-      return res.status(400).json({
-        error: true,
-        message: 'Email sudah terdaftar!'
-      });
-    }
-
-    if (role !== 'student' && role !== 'admin') {
-      return res.status(400).json({
-        error: true,
-        message: 'Role tidak di ijinkan!'
-      });
-    }
-
-    const splitedName = trimmedName.split(' ').join('+')
-    const avatar = `https://ui-avatars.com/api/?name=${splitedName}`;
-
-    const salt = 12
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const { angkatan, prodi } = extractAngkatanProdi(user_id);
-    const userData = {
-      user_id,
-      name: trimmedName,
-      email: trimmedEmail,
-      password: hashedPassword,
-      role,
-      avatar,
-      student_detail: {
-        kelas,
-        jenis_kelamin,
-        jenis_beasiswa,
-        angkatan: angkatan,
-        prodi: prodi
-      }
-    };
-
-    const result = await createUser(userData);
-    const { password: _, ...userWithoutPassword } = result.toJSON();
-
-    return res.status(201).json({
-      error: false,
-      message: 'User berhasil dibuat!',
-      data: {
-        newUser: userWithoutPassword
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      error: true,
-      message: `${error.message}`
-    });
-  }
-}
-
 //All user
 export const allUserController = async (req, res) => {
   try {
     const userData = await getAllUsers();
-    if (!userData) {
+    if (userData.length === 0) {
       return res.status(400).json({
         error: true,
-        message: 'Data tidak ditemukan!'
+        message: "Data tidak ditemukan!",
       });
     }
 
     return res.status(200).json({
       error: false,
-      message: 'Ok',
+      message: "Ok",
       data: {
         users: userData,
-      }
-    })
+      },
+    });
   } catch (error) {
     res.status(500).json({
       error: true,
       message: `${error.message}`,
     });
   }
-}
+};
 
 //Get profile by id
 export const getProfileByIdController = async (req, res) => {
@@ -153,7 +103,7 @@ export const getProfileByIdController = async (req, res) => {
     if (!user_id) {
       return res.status(400).json({
         error: true,
-        message: 'ID tidak ditemukan!'
+        message: "ID tidak ditemukan!",
       });
     }
 
@@ -161,13 +111,13 @@ export const getProfileByIdController = async (req, res) => {
     if (!userData) {
       return res.status(404).json({
         error: true,
-        message: 'Data tidak ditemukan!'
+        message: "Data tidak ditemukan!",
       });
     }
 
     return res.status(200).json({
       error: false,
-      message: 'Ok',
+      message: "Ok",
       data: {
         user: userData,
       },
@@ -175,10 +125,10 @@ export const getProfileByIdController = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       error: true,
-      message: `${error.message}`
+      message: `${error.message}`,
     });
   }
-}
+};
 
 //Get detail profile by id
 export const getDetailProfileByIdController = async (req, res) => {
@@ -189,51 +139,58 @@ export const getDetailProfileByIdController = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         error: true,
-        message: 'Data user tidak ditemukan!'
+        message: "Data user tidak ditemukan!",
       });
     }
 
     return res.status(200).json({
       error: false,
-      message: 'OK',
+      message: "OK",
       data: { user },
     });
   } catch (error) {
     res.status(500).json({
       error: true,
-      message: `${error.message}`
+      message: `Error: ${error.message}`,
     });
   }
-}
+};
 
-//Edit user profile
+// Update profil by id
 export const updateUserController = async (req, res) => {
   try {
     const { user_id } = req.params;
     const { name, no_hp, alamat } = req.body;
 
+    if (!name && !no_hp && !alamat) {
+      return res.status(400).json({
+        error: true,
+        message: "Data tidak boleh kosong!",
+      });
+    }
+
     const updatedData = await updateUserProfile(user_id, {
       name,
       student_detail: {
         no_hp,
-        alamat
+        alamat,
       },
     });
 
     return res.status(200).json({
       error: false,
-      message: 'Data updated!',
+      message: "Data updated!",
       data: {
-        updatedData
-      }
-    })
+        updatedData,
+      },
+    });
   } catch (error) {
     return res.status(500).json({
       error: true,
-      message: `${error.message}`,
+      message: `Error: ${error.message}`,
     });
   }
-}
+};
 
 //Upload avatar
 export const uploadAvatarController = async (req, res) => {
@@ -243,7 +200,7 @@ export const uploadAvatarController = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({
         error: true,
-        message: 'File tidak ditemukan!'
+        message: "File tidak ditemukan!",
       });
     }
 
@@ -253,25 +210,44 @@ export const uploadAvatarController = async (req, res) => {
     if (!user) {
       return res.status(400).json({
         error: true,
-        message: 'User tidak ditemukan!'
+        message: "User tidak ditemukan!",
       });
+    }
+
+    // Hapus avatar lama kalau ada
+    if (user.avatar) {
+      const oldPath = path.resolve('src', user.avatar.replace(/^\/+/, ''));
+      try {
+        await fs.promises.unlink(oldPath);
+      } catch (error) {
+        console.warn(`Gagal hapus file lama: ${err.message}`);
+      }
     }
 
     const result = await user.update({ avatar: avatarUrl });
 
     return res.status(200).json({
       error: false,
-      message: 'Ok',
+      message: "success",
       data: {
         user: {
           avatar: result.avatar,
-        }
-      }
+        },
+      },
     });
-  } catch {
+  } catch (error) {
     return res.status(500).json({
       error: true,
-      message: error.message
+      message: `Error: ${error.message}`,
     });
+  }
+};
+
+//Upload laporan monev
+export const uploadLaporanMonevController = async (req, res) => {
+  try {
+    
+  } catch (error) {
+
   }
 }

@@ -1,21 +1,18 @@
 import express from "express";
-import { body } from "express-validator";
+import { createNewAdminController, createNewMhsAccByAdminController, updateUserByAdminController } from "../../controller/admin/adminUserController.js";
+import { verifyAdmin } from "../../middleware/verifyAdmin.js";
 
 export const adminRouter = express.Router();
 
 //Create admin account
-adminRouter.post('/register', [
-  body('name').isString().isLength({ min: 3 }),
-  body('email').isString(),
-  body('password').isLength({ min: 6 })
-], createNewAdminController);
+adminRouter.post('/register', verifyAdmin, createNewAdminController);
 //Create mhs account
-adminRouter.post('/users', verifyAdmin, createUserByAdminController);
+adminRouter.post('/new/user', verifyAdmin, createNewMhsAccByAdminController);
 //Update data mhs
-adminRouter.put("/users/:user_id", verifyAdmin, updateUserByAdminController);
-//Approve monev
-adminRouter.patch('/monev/:user_id/approve', verifyAdmin, approveMonevController);
-//Reject monev
-adminRouter.patch('/monev/:user_id/reject', verifyAdmin, rejectMonevController);
-//Revise monev
-adminRouter.patch('/monev/:user_id/revise', verifyAdmin, reviseMonevController);
+adminRouter.put("/users/edit/:user_id", verifyAdmin, updateUserByAdminController);
+// //Approve monev
+// adminRouter.patch('/monev/:user_id/approve', approveMonevController);
+// //Reject monev
+// adminRouter.patch('/monev/:user_id/reject', rejectMonevController);
+// //Revise monev
+// adminRouter.patch('/monev/:user_id/revise', reviseMonevController);

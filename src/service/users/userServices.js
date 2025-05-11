@@ -102,3 +102,9 @@ export const updateUserProfile = async (user_id, userData) => {
     throw error;
   }
 };
+
+// Validasi Email
+export const validateEmail = (email) => {
+  const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+  return emailRegex.test(email);
+}
